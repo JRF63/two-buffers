@@ -113,6 +113,34 @@ pub unsafe fn avx256(buffer_a: &[u8], buffer_b: &[u8]) -> i32 {
     sum + sum_remainder
 }
 
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx")]
+pub unsafe fn avx256v2(buffer_a: &[u8], buffer_b: &[u8]) -> i32 {
+    use core::arch::x86_64::*;
+
+    let chunks_iter_a = buffer_a.chunks_exact(16);
+    let chunks_iter_b = buffer_b.chunks_exact(16);
+
+    let sum_remainder: i32 = chunks_iter_a
+        .remainder()
+        .iter()
+        .zip(chunks_iter_b.remainder())
+        .map(|(&a, &b)| (a as i32 - b as i32).pow(2))
+        .sum();
+    let sum: i32 = chunks_iter_a
+        .zip(chunks_iter_b)
+        .map(|(chunks_a, chunks_b)| {
+            let va = _mm256_cvtepu8_epi16(_mm_loadu_si128(chunks_a.as_ptr().cast()));
+            let vb = _mm256_cvtepu8_epi16(_mm_loadu_si128(chunks_b.as_ptr().cast()));
+            let diff = _mm256_sub_epi16(va, vb);
+            let sqr: [i32; 8] = std::mem::transmute(_mm256_madd_epi16(diff, diff));
+            sqr.iter().sum::<i32>()
+        })
+        .sum();
+
+    sum + sum_remainder
+}
+
 pub fn sum_using_iterator(buffer_a: &[u8], buffer_b: &[u8]) -> i32 {
     buffer_a
         .chunks(3)
@@ -152,6 +180,7 @@ mod tests {
         #[cfg(target_arch = "x86_64")]
         unsafe {
             assert_eq!(avx256(&buffer_a, &buffer_b), correct_sum);
+            assert_eq!(avx256v2(&buffer_a, &buffer_b), correct_sum);
         }
         assert_eq!(sum_using_iterator(&buffer_a, &buffer_b), correct_sum);
     }

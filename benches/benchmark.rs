@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use two_buffers::{
-    avx256, dummy_input, four_at_a_time, regular_loop, straightforward_sum, sum_using_iterator,
+    avx256, avx256v2, dummy_input, four_at_a_time, regular_loop, straightforward_sum, sum_using_iterator,
 };
 
 fn criterion_benchmark(c: &mut Criterion) {
@@ -25,6 +25,9 @@ fn criterion_benchmark(c: &mut Criterion) {
     unsafe {
         c.bench_function("avx256", |b| {
             b.iter(|| black_box(avx256(black_box(&buffer_a), black_box(&buffer_b))))
+        });
+        c.bench_function("avx256v2", |b| {
+            b.iter(|| black_box(avx256v2(black_box(&buffer_a), black_box(&buffer_b))))
         });
     }
     c.bench_function("sum_using_iterator", |b| {
